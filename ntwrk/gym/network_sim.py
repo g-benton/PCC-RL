@@ -352,7 +352,7 @@ class SimulatedNetworkEnv(gym.Env):
         self.viewer = None
         self.rand = None
 
-        self.min_bw, self.max_bw = (100, 500)
+        self.min_bw, self.max_bw = (100, 300)
         self.min_lat, self.max_lat = (0.05, 0.5)
         self.min_queue, self.max_queue = (0, 8)
         self.min_loss, self.max_loss = (0.0, 0.05)

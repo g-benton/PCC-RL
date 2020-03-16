@@ -2,23 +2,46 @@ import math
 import torch
 import gpytorch
 from gpytorch.kernels import RBFKernel, MaternKernel
+import numpy as np
+import matplotlib.pyplot as plt
 
-def expected_improvement(pred_dist, current_max, explore=0.):
+def expected_improvement(bayesopt, test_points, explore=0.01):
     """
     Standard expected improvement
     take in predictive distribution and current max (optional exploration parameter)
     returns the expected improvment at all points
     """
+    bayesopt.surrogate.train()
+    mu_sample = bayesopt.surrogate(bayesopt.train_x).mean
+    current_max, max_ind = mu_sample.max(0)
 
-    means = pred_dist.mean
-    vars = pred_dist.variance
+    bayesopt.surrogate.eval()
+    bayesopt.surrogate_lh.eval()
+    pred_dist = bayesopt.surrogate_lh(bayesopt.surrogate(test_points))
+    mu_test = pred_dist.mean
+    var_test = pred_dist.variance
 
-    std_vals = (means - current_max - explore)
+
+    imp = mu_test - current_max - explore
+    z = imp.div(var_test)
     std_normal = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0]))
-    first_term = std_vals.mul(std_normal.cdf(std_vals))
-    second_term = vars.mul(std_normal.log_prob(std_vals).exp())
 
-    return first_term + second_term
+    ei = imp * std_normal.cdf(z) + var_test * std_normal.log_prob(z).exp()
+    ei[var_test == 0.] = 0.
+
+    fig, ax1 = plt.subplots()
+    ax1.plot(bayesopt.train_x, bayesopt.train_y.detach(),
+             marker='.', linestyle="None", label="observed")
+    ax1.plot(bayesopt.train_x, mu_sample.detach(), label="Train mean")
+    ax1.plot(test_points, mu_test.detach(), label="Pred Mean")
+    ax2 = ax1.twinx()
+    ax2.plot(test_points, ei.detach(),
+             label="EI")
+    fig.legend()
+    plt.show()
+
+
+    return ei
 
 def max_mean(pred_dist, current_max):
     return pred_dist.mean
@@ -49,44 +72,67 @@ class BayesOpt(object):
     Current implementation uses a naive approach that just rounds the acquired
     value to the nearest integer
     """
-    def __init__(self, train_x=None, train_y=None, kernel=RBFKernel,
-                 acquistion=expected_improvement, normalize=True, max_x=1000):
+    def __init__(self, train_x=None, train_y=None, kernel=MaternKernel,
+                 acquistion=expected_improvement, normalize=True,
+                 normalize_y=True, max_x=1000):
 
         self.acquisition = acquistion
-        self.train_x = train_x.float().clone()
+
         self.max_x = max_x
-        self.train_y = train_y.float().clone()
+        self.y_mean = torch.tensor(0.)
+        self.y_std = torch.tensor(1.)
 
         self.normalize = normalize
-        if self.normalize:
-            self.train_x = self.train_x.div(self.max_x)
+        self.normalize_y = normalize_y
 
+        self.kernel = kernel
+        if train_x is not None:
+            self.train_x = train_x.float().clone()
+            self.train_y = train_y.float().clone()
+
+            if self.normalize:
+                self.train_x = self.train_x.div(self.max_x)
+
+        else:
+            self.train_x = None
+            self.train_y = None
             # self.y_mean = self.train_y.mean()
             # self.y_std = self.train_y.std()
             # self.train_y = (self.train_y - self.y_mean).div(self.y_std)
 
         self.surrogate_lh = gpytorch.likelihoods.GaussianLikelihood()
-        self.surrogate_lh.noise.data[0] = -1.
+        # self.surrogate_lh.noise.data[0] = -1.
         self.surrogate = Surrogate(self.train_x, self.train_y, self.surrogate_lh,
-                                   kernel=kernel)
+                                   kernel=self.kernel)
 
-    def train_surrogate(self, lr=0.01, iters=50):
-        self.surrogate.train()
-        self.surrogate_lh.train()
+    def train_surrogate(self, lr=0.01, iters=50, overwrite=False):
+        if overwrite:
+            ## I think it might be useful to wipe out the GP each time #
+            self.surrogate_lh = gpytorch.likelihoods.GaussianLikelihood()
+            # self.surrogate_lh.noise.data[0] = -1.
+            self.surrogate = Surrogate(self.train_x, self.train_y, self.surrogate_lh,
+                                       kernel=self.kernel)
 
-        optimizer = torch.optim.Adam(self.surrogate.parameters(), lr=lr)
-        mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.surrogate_lh,
-                                                       self.surrogate)
 
-        for i in range(iters):
-            # Zero gradients from previous iteration
-            optimizer.zero_grad()
-            # Output from model
-            output = self.surrogate(self.train_x)
-            # Calc loss and backprop gradients
-            loss = -mll(output, self.train_y)
-            loss.backward()
-            optimizer.step()
+        if self.train_x is not None:
+            # self.surrogate_lh.noise.data = torch.tensor(-2.)
+            self.surrogate.train()
+            self.surrogate_lh.train()
+
+            optimizer = torch.optim.Adam(self.surrogate.parameters(), lr=lr)
+            mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.surrogate_lh,
+                                                           self.surrogate)
+
+            for i in range(iters):
+                # Zero gradients from previous iteration
+                optimizer.zero_grad()
+                # Output from model
+                output = self.surrogate(self.train_x)
+                # Calc loss and backprop gradients
+                loss = -mll(output, self.train_y)
+                loss.backward()
+                optimizer.step()
+                # print(loss.item())
 
     def acquire(self, **kwargs):
         """
@@ -96,32 +142,85 @@ class BayesOpt(object):
         but further down the line we should figure out a way to get a viable
         range for CWND sizes.
         """
-        test_points = torch.linspace(0, self.max_x, 1000).float()
+        jitter_num = 50 # maximum points to jitter from boundary if hit
+        test_size = 200 # how many bins to break test domain into
+
+
+        test_points = torch.linspace(0, self.max_x, test_size).float()
         if self.normalize:
             int_test_points = test_points.clone()
             test_points = test_points.div(self.max_x)
 
+        if self.train_x is None:
+            ## if we haven't passed in training data
+            ## then just pick a random point and return
+            if self.normalize:
+                return np.random.choice(int_test_points)
+            else:
+                return np.random.choice(test_points)
+
         self.surrogate.eval()
         self.surrogate_lh.eval()
 
-        test_dist = self.surrogate_lh(self.surrogate(test_points))
-        best_y, ind = self.train_y.max(0)
+        # test_dist = self.surrogate_lh(self.surrogate(test_points))
+        # best_y, ind = self.train_y.max(0)
 
-        acquisition = self.acquisition(test_dist, best_y, **kwargs)
+        acquisition = self.acquisition(self, test_points, **kwargs)
         best_ac, ind = acquisition.max(0)
-        # print(test_points)
-        print(test_points[ind])
+        if ind == test_points.numel()-1:
+            print("hitting boundary")
+            ind -= np.random.choice(jitter_num)
+        elif ind == 0:
+            print("hitting boundary")
+            ind == np.random.choice(jitter_num)
+        # print(test_points[ind])
         if self.normalize:
             return int_test_points[ind]
         else:
             return test_points[ind]
 
-    def update_obs(self, x, y):
-        self.train_y = torch.cat((self.train_y, y))
-        if self.normalize:
-            self.train_x = torch.cat((self.train_x, x.div(self.max_x)))
-        else:
-            self.train_x = torch.cat((self.train_x, x))
+    def update_obs(self, x, y, max_obs=None):
+        '''
+        Step window controls the maximum number of observations allowed
+        '''
+        print("before update: ")
+        print(self.surrogate.train_inputs[0].shape)
+        if self.train_x is None:
+            self.train_x = x
+            self.train_y = y
+            self.y_mean = train_y.mean()
+            self.y_std = torch.tensor(1.)
 
+        else:
+            ## if we're normalizing then de-normalize the previous observations
+            if self.normalize:
+                self.train_x = self.train_x * self.max_x
+            if self.normalize_y:
+                self.train_y = self.train_y * self.y_std + self.y_mean
+
+            ## now concatenate everything together
+            self.train_x = torch.cat((self.train_x, x))
+            self.train_y = torch.cat((self.train_y, y))
+
+
+
+        if max_obs is not None and self.train_x.numel() > max_obs:
+            ## cutoff previous observations if needed ##
+            self.train_x = self.train_x[-max_obs:]
+            self.train_y = self.train_y[-max_obs:]
+
+        ## at this point everything _should_ be unnormalized, so fix that ##
+        if self.normalize:
+            self.train_x = self.train_x.div(self.max_x)
+        if self.normalize_y:
+            self.y_mean = self.train_y.mean()
+            if self.train_y.numel() > 1:
+                self.y_std = self.train_y.std()
+            else:
+                self.y_std = torch.tensor(1.)
+
+            self.train_y = (self.train_y - self.y_mean).div(self.y_std)
 
         self.surrogate.set_train_data(self.train_x, self.train_y, strict=False)
+        print("after update: ")
+        print(self.surrogate.train_inputs[0].shape)
