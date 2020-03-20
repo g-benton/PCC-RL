@@ -117,9 +117,9 @@ class BayesOpt(object):
 
         if self.train_x is not None:
 
-            print("train x = ", self.train_x)
-            print("train y = ", self.train_y)
-            print(self.surrogate)
+            # print("train x = ", self.train_x)
+            # print("train y = ", self.train_y)
+            # print(self.surrogate)
             # self.surrogate_lh.noise.data = torch.tensor(-2.)
             self.surrogate.train()
             self.surrogate_lh.train()
@@ -137,7 +137,7 @@ class BayesOpt(object):
                 loss = -mll(output, self.train_y)
                 loss.backward()
                 optimizer.step()
-                print(loss.item())
+                # print(loss.item())
 
     def acquire(self, **kwargs):
         """
@@ -188,8 +188,8 @@ class BayesOpt(object):
         '''
         Step window controls the maximum number of observations allowed
         '''
-        print("before update: ")
-        print(self.surrogate.train_inputs[0].shape)
+        # print("before update: ")
+        # print(self.surrogate.train_inputs[0].shape)
         if self.train_x is None:
             self.train_x = x
             self.train_y = y
@@ -227,5 +227,5 @@ class BayesOpt(object):
             self.train_y = (self.train_y - self.y_mean).div(self.y_std)
 
         self.surrogate.set_train_data(self.train_x, self.train_y, strict=False)
-        print("after update: ")
-        print(self.surrogate.train_inputs[0].shape)
+        # print("after update: ")
+        # print(self.surrogate.train_inputs[0].shape)
