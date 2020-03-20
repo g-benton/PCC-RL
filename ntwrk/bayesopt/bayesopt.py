@@ -29,16 +29,16 @@ def expected_improvement(bayesopt, test_points, explore=0.01):
     ei = imp * std_normal.cdf(z) + var_test * std_normal.log_prob(z).exp()
     ei[var_test == 0.] = 0.
 
-    fig, ax1 = plt.subplots()
-    ax1.plot(bayesopt.train_x, bayesopt.train_y.detach(),
-             marker='.', linestyle="None", label="observed")
-    ax1.plot(bayesopt.train_x, mu_sample.detach(), label="Train mean")
-    ax1.plot(test_points, mu_test.detach(), label="Pred Mean")
-    ax2 = ax1.twinx()
-    ax2.plot(test_points, ei.detach(),
-             label="EI")
-    fig.legend()
-    plt.show()
+    # fig, ax1 = plt.subplots()
+    # ax1.plot(bayesopt.train_x, bayesopt.train_y.detach(),
+    #          marker='.', linestyle="None", label="observed")
+    # ax1.plot(bayesopt.train_x, mu_sample.detach(), label="Train mean")
+    # ax1.plot(test_points, mu_test.detach(), label="Pred Mean")
+    # ax2 = ax1.twinx()
+    # ax2.plot(test_points, ei.detach(),
+    #          label="EI")
+    # fig.legend()
+    # plt.show()
 
 
     return ei
@@ -86,6 +86,7 @@ class BayesOpt(object):
         self.normalize_y = normalize_y
 
         self.kernel = kernel
+
         if train_x is not None:
             self.train_x = train_x.float().clone()
             self.train_y = train_y.float().clone()
@@ -105,7 +106,7 @@ class BayesOpt(object):
         self.surrogate = Surrogate(self.train_x, self.train_y, self.surrogate_lh,
                                    kernel=self.kernel)
 
-    def train_surrogate(self, lr=0.01, iters=50, overwrite=False):
+    def train_surrogate(self, iters=50, lr=0.01, overwrite=False):
         if overwrite:
             ## I think it might be useful to wipe out the GP each time #
             self.surrogate_lh = gpytorch.likelihoods.GaussianLikelihood()
@@ -115,6 +116,10 @@ class BayesOpt(object):
 
 
         if self.train_x is not None:
+
+            print("train x = ", self.train_x)
+            print("train y = ", self.train_y)
+            print(self.surrogate)
             # self.surrogate_lh.noise.data = torch.tensor(-2.)
             self.surrogate.train()
             self.surrogate_lh.train()
@@ -132,7 +137,7 @@ class BayesOpt(object):
                 loss = -mll(output, self.train_y)
                 loss.backward()
                 optimizer.step()
-                # print(loss.item())
+                print(loss.item())
 
     def acquire(self, **kwargs):
         """
