@@ -37,6 +37,7 @@ def expected_improvement(bayesopt, test_points, explore=0.01):
     # ax2 = ax1.twinx()
     # ax2.plot(test_points, ei.detach(),
     #          label="EI")
+    # ax1.set_xlim(0, 1.)
     # fig.legend()
     # plt.show()
 
@@ -74,7 +75,7 @@ class BayesOpt(object):
     """
     def __init__(self, train_x=None, train_y=None, kernel=MaternKernel,
                  acquistion=expected_improvement, normalize=True,
-                 normalize_y=True, max_x=1000):
+                 normalize_y=True, max_x=1000, max_jump=300):
 
         self.acquisition = acquistion
 
@@ -84,6 +85,8 @@ class BayesOpt(object):
 
         self.normalize = normalize
         self.normalize_y = normalize_y
+
+        self.max_jump = max_jump
 
         self.kernel = kernel
 
@@ -110,7 +113,7 @@ class BayesOpt(object):
         if overwrite:
             ## I think it might be useful to wipe out the GP each time #
             self.surrogate_lh = gpytorch.likelihoods.GaussianLikelihood()
-            # self.surrogate_lh.noise.data[0] = -1.
+            self.surrogate_lh.noise.data[0] = -1.
             self.surrogate = Surrogate(self.train_x, self.train_y, self.surrogate_lh,
                                        kernel=self.kernel)
 
@@ -151,8 +154,27 @@ class BayesOpt(object):
         test_size = 200 # how many bins to break test domain into
 
 
-        test_points = torch.linspace(0, self.max_x, test_size).float()
+        if self.train_x is None:
+            ## if no tested points ##
+            test_points = torch.linspace(0, self.max_x, test_size).float()
+        else:
+            ## if we have observations make bounded jumps ##
+            last_rate = self.train_x[-1].mul(self.max_x)
+            low_test = torch.max(torch.tensor(0.),
+                                 last_rate - self.max_jump)
+            high_test = torch.min(torch.tensor(float(self.max_x)),
+                                  last_rate + self.max_jump)
+            test_points = torch.linspace(low_test, high_test, test_size)
+
         if self.normalize:
+            # ## bounded jumps ##
+            # bnd = self.max_jump / self.max_x
+            # low_test = torch.max(torch.tensor(0.),
+            #                      self.train_x[-1].mul(self.max_x) - self.max_jump)
+            # high_test = torch.min(torch.tensor(self.max_x),
+            #                       self.train_x[-1].mul(self.max_x) + self.max_jump)
+            # test_points = torch.linspace(low_test, high_test, test_size).float()
+
             int_test_points = test_points.clone()
             test_points = test_points.div(self.max_x)
 
@@ -164,6 +186,8 @@ class BayesOpt(object):
             else:
                 return np.random.choice(test_points)
 
+        # print("low test = ", test_points.min())
+        # print("high test = ", test_points.max())
         self.surrogate.eval()
         self.surrogate_lh.eval()
 
@@ -173,10 +197,10 @@ class BayesOpt(object):
         acquisition = self.acquisition(self, test_points, **kwargs)
         best_ac, ind = acquisition.max(0)
         if ind == test_points.numel()-1:
-            print("hitting boundary")
+            # print("hitting boundary")
             ind -= np.random.choice(jitter_num)
         elif ind == 0:
-            print("hitting boundary")
+            # print("hitting boundary")
             ind == np.random.choice(jitter_num)
         # print(test_points[ind])
         if self.normalize:

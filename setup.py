@@ -14,7 +14,7 @@ else:
 setup(
     name='ntwrk',
     version='alpha',
-    description=('Repo for Bayesian Optimization of Congestion Control'),
+    description=("Bayes Opt CC"),
     long_description=long_description,
     author='Greg Benton, Nihar Sawant',
     author_email='',
