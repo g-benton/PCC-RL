@@ -36,7 +36,7 @@ MIN_CWND = 4
 MAX_RATE = 1000
 MIN_RATE = 40
 
-REWARD_SCALE = 0.0005
+REWARD_SCALE = 0.001
 
 MAX_STEPS = 400
 
@@ -108,7 +108,7 @@ class Network():
         for sender in self.senders:
             sender.register_network(self)
             sender.reset_obs()
-            heapq.heappush(self.q, (1.0 / sender.rate, sender, EVENT_TYPE_SEND, 0, 0.0, False))
+            heapq.heappush(self.q, (1.0 / sender.rate, 0.0, EVENT_TYPE_SEND, 0, sender, False))
 
     def reset(self):
         self.cur_time = 0.0
@@ -126,7 +126,7 @@ class Network():
             sender.reset_obs()
 
         while self.cur_time < end_time:
-            event_time, sender, event_type, next_hop, cur_latency, dropped = heapq.heappop(self.q)
+            event_time, cur_latency, event_type, next_hop, sender, dropped = heapq.heappop(self.q)
             #print("Got event %s, to link %d, latency %f at time %f" % (event_type, next_hop, cur_latency, event_time))
             self.cur_time = event_time
             new_event_time = event_time
@@ -158,7 +158,7 @@ class Network():
                     if sender.can_send_packet():
                         sender.on_packet_sent()
                         push_new_event = True
-                    heapq.heappush(self.q, (self.cur_time + (1.0 / sender.rate), sender, EVENT_TYPE_SEND, 0, 0.0, False))
+                    heapq.heappush(self.q, (self.cur_time + (1.0 / sender.rate), 0.0, EVENT_TYPE_SEND, 0, sender, False))
 
                 else:
                     push_new_event = True
@@ -175,35 +175,41 @@ class Network():
                 new_dropped = not sender.path[next_hop].packet_enters_link(self.cur_time)
 
             if push_new_event:
-                heapq.heappush(self.q, (new_event_time, sender, new_event_type, new_next_hop, new_latency, new_dropped))
+                heapq.heappush(self.q, (new_event_time, new_latency, new_event_type, new_next_hop, sender, new_dropped))
 
-        sender_mi = self.senders[0].get_run_data()
-        throughput = sender_mi.get("recv rate")
-        latency = sender_mi.get("avg latency")
-        loss = sender_mi.get("loss ratio")
-        bw_cutoff = self.links[0].bw * 0.8
-        lat_cutoff = 2.0 * self.links[0].dl * 1.5
-        loss_cutoff = 2.0 * self.links[0].lr * 1.5
-        #print("thpt %f, bw %f" % (throughput, bw_cutoff))
-        #reward = 0 if (loss > 0.1 or throughput < bw_cutoff or latency > lat_cutoff or loss > loss_cutoff) else 1 #
 
-        # Super high throughput
-        #reward = REWARD_SCALE * (20.0 * throughput / RATE_OBS_SCALE - 1e3 * latency / LAT_OBS_SCALE - 2e3 * loss)
+        rewards = np.zeros(len(self.senders))
+        for sndr in range(len(self.senders)):
 
-        # Very high thpt
-        # reward = (10.0 * throughput / (8 * BYTES_PER_PACKET) - 1e3 * latency - 2e3 * loss)
+            sender_mi = self.senders[sndr].get_run_data()
+            throughput = sender_mi.get("recv rate")
+            latency = sender_mi.get("avg latency")
+            loss = sender_mi.get("loss ratio")
+            bw_cutoff = self.links[0].bw * 0.8
+            lat_cutoff = 2.0 * self.links[0].dl * 1.5
+            loss_cutoff = 2.0 * self.links[0].lr * 1.5
+            #print("thpt %f, bw %f" % (throughput, bw_cutoff))
+            #reward = 0 if (loss > 0.1 or throughput < bw_cutoff or latency > lat_cutoff or loss > loss_cutoff) else 1 #
 
-        # High thpt
-        reward = REWARD_SCALE * (5.0 * throughput / (8 * BYTES_PER_PACKET) - 1e3 * latency - 2e3 * loss)
+            # Super high throughput
+            #reward = REWARD_SCALE * (20.0 * throughput / RATE_OBS_SCALE - 1e3 * latency / LAT_OBS_SCALE - 2e3 * loss)
 
-        # Low latency
-        #reward = REWARD_SCALE * (2.0 * throughput / RATE_OBS_SCALE - 1e3 * latency / LAT_OBS_SCALE - 2e3 * loss)
-        #if reward > 857:
-        #print("Reward = %f, thpt = %f, lat = %f, loss = %f" % (reward, throughput, latency, loss))
+            # Very high thpt
+            # reward = (10.0 * throughput / (8 * BYTES_PER_PACKET) - 1e3 * latency - 2e3 * loss)
 
-        #reward = (throughput / RATE_OBS_SCALE) * np.exp(-1 * (LATENCY_PENALTY * latency / LAT_OBS_SCALE + LOSS_PENALTY * loss))
-        return reward * REWARD_SCALE
+            # High thpt
+            reward = REWARD_SCALE * (5.0 * throughput / (8 * BYTES_PER_PACKET) - 1e3 * latency - 2e3 * loss)
 
+            # Low latency
+            #reward = REWARD_SCALE * (2.0 * throughput / RATE_OBS_SCALE - 1e3 * latency / LAT_OBS_SCALE - 2e3 * loss)
+            #if reward > 857:
+            #print("Reward = %f, thpt = %f, lat = %f, loss = %f" % (reward, throughput, latency, loss))
+
+            #reward = (throughput / RATE_OBS_SCALE) * np.exp(-1 * (LATENCY_PENALTY * latency / LAT_OBS_SCALE + LOSS_PENALTY * loss))
+            rewards[sndr] = reward
+        return rewards
+
+# self.senders = [Sender(random.uniform(0.3, 1.5) * bw, [self.links[0], self.links[1]], 0, self.features, history_len=self.history_len)]
 class Sender():
 
     def __init__(self, rate, path, dest, features, cwnd=25, history_len=10):
@@ -343,7 +349,7 @@ class Sender():
 
 class SimulatedNetworkEnv(gym.Env):
 
-    def __init__(self,
+    def __init__(self, n_senders=2,
                  history_len=arg_or_default("--history-len", default=10),
                  features=arg_or_default("--input-features",
                     default="sent latency inflation,"
@@ -363,7 +369,7 @@ class SimulatedNetworkEnv(gym.Env):
 
         self.links = None
         self.senders = None
-        self.create_new_links_and_senders()
+        self.create_new_links_and_senders(n_senders)
         self.net = Network(self.senders, self.links)
         self.run_dur = None
         self.run_period = 0.1
@@ -423,7 +429,8 @@ class SimulatedNetworkEnv(gym.Env):
         ######################
 
         # just changing the rate flat out
-        self.senders[0].set_rate(actions[0].item())
+        for sndr in range(actions.shape[0]):
+            self.senders[sndr].set_rate(actions[sndr, 0].item())
 
         ##################
         ## DON'T CHANGE ##
@@ -455,6 +462,9 @@ class SimulatedNetworkEnv(gym.Env):
 
         should_stop = False
 
+        # print(self.senders[0].get_run_data())
+        # print(self.senders[1].get_run_data())
+
         self.reward_sum += reward
         return sender_obs, reward, (self.steps_taken >= self.max_steps or should_stop), {}
 
@@ -466,7 +476,7 @@ class SimulatedNetworkEnv(gym.Env):
         for sender in self.senders:
             sender.print_debug()
 
-    def create_new_links_and_senders(self):
+    def create_new_links_and_senders(self, n_senders):
         bw    = random.uniform(self.min_bw, self.max_bw)
         lat   = random.uniform(self.min_lat, self.max_lat)
         queue = 1 + int(np.exp(random.uniform(self.min_queue, self.max_queue)))
@@ -475,16 +485,18 @@ class SimulatedNetworkEnv(gym.Env):
         #lat   = 0.03
         #queue = 5
         #loss  = 0.00
-        self.links = [Link(bw, lat, queue, loss), Link(bw, lat, queue, loss)]
+        self.links = [Link(bw, lat, queue, loss), Link(bw, lat, queue, loss), Link(bw, lat, queue, loss)]
         #self.senders = [Sender(0.3 * bw, [self.links[0], self.links[1]], 0, self.history_len)]
         #self.senders = [Sender(random.uniform(0.2, 0.7) * bw, [self.links[0], self.links[1]], 0, self.history_len)]
-        self.senders = [Sender(random.uniform(0.3, 1.5) * bw, [self.links[0], self.links[1]], 0, self.features, history_len=self.history_len)]
+        self.senders = []
+        for sndr in range(n_senders):
+            self.senders.append(Sender(random.uniform(0.3, 1.5) * bw, [self.links[0], self.links[sndr]], sndr, self.features, history_len=self.history_len))
         self.run_dur = 3 * lat
 
-    def reset(self):
+    def reset(self, n_senders=2):
         self.steps_taken = 0
         self.net.reset()
-        self.create_new_links_and_senders()
+        self.create_new_links_and_senders(n_senders)
         self.net = Network(self.senders, self.links)
         self.episodes_run += 1
         if self.episodes_run > 0 and self.episodes_run % 100 == 0:
@@ -510,6 +522,6 @@ class SimulatedNetworkEnv(gym.Env):
         with open(filename, 'w') as f:
             json.dump(self.event_record, f, indent=4)
 
-register(id='PccNs-v0', entry_point='network_sim:SimulatedNetworkEnv')
+register(id='Sndr-v0', entry_point='multi_sender_sim:SimulatedNetworkEnv')
 #env = SimulatedNetworkEnv()
 #env.step([1.0])

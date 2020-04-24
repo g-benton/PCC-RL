@@ -74,10 +74,10 @@ class BayesOpt(object):
     value to the nearest integer
     """
     def __init__(self, train_x=None, train_y=None, kernel=MaternKernel,
-                 acquistion=expected_improvement, normalize=True,
+                 acquisition=expected_improvement, normalize=True,
                  normalize_y=True, max_x=1000, max_jump=300):
 
-        self.acquisition = acquistion
+        self.acquisition = acquisition
 
         self.max_x = max_x
         self.y_mean = torch.tensor(0.)
@@ -113,7 +113,7 @@ class BayesOpt(object):
         if overwrite:
             ## I think it might be useful to wipe out the GP each time #
             self.surrogate_lh = gpytorch.likelihoods.GaussianLikelihood()
-            self.surrogate_lh.noise.data[0] = -1.
+            self.surrogate_lh.noise.data[0] = -2.
             self.surrogate = Surrogate(self.train_x, self.train_y, self.surrogate_lh,
                                        kernel=self.kernel)
 
@@ -253,3 +253,13 @@ class BayesOpt(object):
         self.surrogate.set_train_data(self.train_x, self.train_y, strict=False)
         # print("after update: ")
         # print(self.surrogate.train_inputs[0].shape)
+
+    def get_pred_dist(self, test_x, compute_cov=False):
+        self.surrogate.eval()
+        self.surrogate_lh.eval()
+
+        pred = self.surrogate(test_x)
+        if compute_cov:
+            pred = self.surrogate_lh(pred)
+
+        return pred
