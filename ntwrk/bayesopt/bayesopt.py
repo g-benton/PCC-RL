@@ -73,7 +73,7 @@ class BayesOpt(object):
     Current implementation uses a naive approach that just rounds the acquired
     value to the nearest integer
     """
-    def __init__(self, train_x=None, train_y=None, kernel=MaternKernel,
+    def __init__(self, train_x=None, train_y=None, kernel=RBFKernel,
                  acquisition=expected_improvement, normalize=True,
                  normalize_y=True, max_x=1000, max_jump=300):
 
@@ -201,8 +201,8 @@ class BayesOpt(object):
             ind -= np.random.choice(jitter_num)
         elif ind == 0:
             # print("hitting boundary")
-            ind == np.random.choice(jitter_num)
-        # print(test_points[ind])
+            jit = np.random.choice(jitter_num)
+            ind = jit
         if self.normalize:
             return int_test_points[ind]
         else:

@@ -42,15 +42,23 @@ def main():
                           acquisition=expected_improvement, max_jump=max_jump)
 
             for ii in range(n_iters):
-                bo.train_surrogate(iters=250, overwrite=False)
-                next_rate = bo.acquire(explore=0.1).unsqueeze(0)
-                rwrd = torch.tensor(env.step(next_rate.mul(bo.max_x))[1]).unsqueeze(0)
+                try:
+                    bo.train_surrogate(iters=250, overwrite=True)
 
-                save_rewards[tt, rcrd_ind, ii] = rwrd.item()
-                save_rates[tt, rcrd_ind, ii] = next_rate.item()
+                    next_rate = bo.acquire(explore=0.1).unsqueeze(0)
+                    rwrd = torch.tensor(env.step(next_rate.mul(bo.max_x))[1]).unsqueeze(0)
 
-                bo.update_obs(next_rate, rwrd, max_obs=rcrd)
+                    save_rewards[tt, rcrd_ind, ii] = rwrd.item()
+                    save_rates[tt, rcrd_ind, ii] = next_rate.item()
 
+                    bo.update_obs(next_rate, rwrd, max_obs=rcrd)
+                except:
+                    save_rewards[tt, rcrd_ind, ii] = rwrd.item()
+                    save_rates[tt, rcrd_ind, ii] = next_rate.item()
+
+                # print(save_rewards[tt, rcrd_ind, ii])
+                # print(save_rates[tt, rcrd_ind, ii])
+                # print("\n")
 
         print("saving trial", tt)
         torch.save(save_rates, "saved_rates.pt")
