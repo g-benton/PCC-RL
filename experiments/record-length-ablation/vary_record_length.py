@@ -14,7 +14,7 @@ def main():
     torch.random.manual_seed(88)
 
     ## SETUP AND DEFS ##
-    max_record = torch.arange(1, 10)
+    max_record = torch.arange(2, 10)
     n_jumps = max_record.numel()
     n_iters = 100
     n_trials = 20
