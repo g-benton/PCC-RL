@@ -240,6 +240,8 @@ class Sender():
         else:
             self.set_rate(self.rate / (1.0 - delta))
 
+        # print("sender rate = ", self.rate)
+
     def apply_cwnd_delta(self, delta):
         delta *= config.DELTA_SCALE
         #print("Applying delta %f" % delta)
@@ -423,7 +425,7 @@ class SimulatedNetworkEnv(gym.Env):
         ######################
 
         # just changing the rate flat out
-        self.senders[0].set_rate(actions[0].item())
+        self.senders[0].apply_rate_delta(actions[0].item())
 
         ##################
         ## DON'T CHANGE ##

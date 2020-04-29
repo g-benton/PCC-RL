@@ -37,7 +37,7 @@ def expected_improvement(bayesopt, test_points, explore=0.01):
     # ax2 = ax1.twinx()
     # ax2.plot(test_points, ei.detach(),
     #          label="EI")
-    # ax1.set_xlim(0, 1.)
+    # # ax1.set_xlim(0, 1.)
     # fig.legend()
     # plt.show()
 
@@ -74,20 +74,17 @@ class BayesOpt(object):
     value to the nearest integer
     """
     def __init__(self, train_x=None, train_y=None, kernel=RBFKernel,
-                 acquisition=expected_improvement, normalize=True,
-                 normalize_y=True, max_x=1000, max_jump=300):
+                 acquisition=expected_improvement, normalize=False,
+                 normalize_y=False, max_delta=10):
 
         self.acquisition = acquisition
 
-        self.max_x = max_x
+        self.max_delta = max_delta
         self.y_mean = torch.tensor(0.)
         self.y_std = torch.tensor(1.)
 
         self.normalize = normalize
         self.normalize_y = normalize_y
-
-        self.max_jump = max_jump
-
         self.kernel = kernel
 
         if train_x is not None:
@@ -95,7 +92,7 @@ class BayesOpt(object):
             self.train_y = train_y.float().clone()
 
             if self.normalize:
-                self.train_x = self.train_x.div(self.max_x)
+                self.train_x = self.train_x.div(self.max_delta)
 
         else:
             self.train_x = None
@@ -154,29 +151,11 @@ class BayesOpt(object):
         test_size = 200 # how many bins to break test domain into
 
 
-        if self.train_x is None:
-            ## if no tested points ##
-            test_points = torch.linspace(0, self.max_x, test_size).float()
-        else:
-            ## if we have observations make bounded jumps ##
-            last_rate = self.train_x[-1].mul(self.max_x)
-            low_test = torch.max(torch.tensor(0.),
-                                 last_rate - self.max_jump)
-            high_test = torch.min(torch.tensor(float(self.max_x)),
-                                  last_rate + self.max_jump)
-            test_points = torch.linspace(low_test, high_test, test_size)
+        test_points = torch.linspace(-self.max_delta, self.max_delta, test_size).float()
 
         if self.normalize:
-            # ## bounded jumps ##
-            # bnd = self.max_jump / self.max_x
-            # low_test = torch.max(torch.tensor(0.),
-            #                      self.train_x[-1].mul(self.max_x) - self.max_jump)
-            # high_test = torch.min(torch.tensor(self.max_x),
-            #                       self.train_x[-1].mul(self.max_x) + self.max_jump)
-            # test_points = torch.linspace(low_test, high_test, test_size).float()
-
             int_test_points = test_points.clone()
-            test_points = test_points.div(self.max_x)
+            test_points = test_points.div(self.max_delta)
 
         if self.train_x is None:
             ## if we haven't passed in training data
@@ -204,7 +183,10 @@ class BayesOpt(object):
             jit = np.random.choice(jitter_num)
             ind = jit
         if self.normalize:
-            return int_test_points[ind]
+            # print(int_test_points)
+            rtrn_val = int_test_points[ind]
+            print("returning ", rtrn_val)
+            return rtrn_val
         else:
             return test_points[ind]
 
@@ -223,15 +205,13 @@ class BayesOpt(object):
         else:
             ## if we're normalizing then de-normalize the previous observations
             if self.normalize:
-                self.train_x = self.train_x * self.max_x
+                self.train_x = self.train_x * self.max_delta
             if self.normalize_y:
                 self.train_y = self.train_y * self.y_std + self.y_mean
 
             ## now concatenate everything together
             self.train_x = torch.cat((self.train_x, x))
             self.train_y = torch.cat((self.train_y, y))
-
-
 
         if max_obs is not None and self.train_x.numel() > max_obs:
             ## cutoff previous observations if needed ##
@@ -240,7 +220,7 @@ class BayesOpt(object):
 
         ## at this point everything _should_ be unnormalized, so fix that ##
         if self.normalize:
-            self.train_x = self.train_x.div(self.max_x)
+            self.train_x = self.train_x.div(self.max_delta)
         if self.normalize_y:
             self.y_mean = self.train_y.mean()
             if self.train_y.numel() > 1:

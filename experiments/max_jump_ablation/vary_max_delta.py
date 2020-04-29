@@ -14,31 +14,30 @@ def main():
     torch.random.manual_seed(88)
 
     ## SETUP AND DEFS ##
-    max_jumps = torch.arange(100, 1001, step=100)
-    n_jumps = max_jumps.numel()
+    max_deltas = torch.tensor([1, 2, 5, 10, 15, 20, 25, 50, 75, 100])
+    n_jumps = max_deltas.numel()
     n_iters = 100
-    n_trials = 50
-    max_x = 1000
+    n_trials = 20
     n_start = 3
 
     save_rewards = torch.zeros(n_trials, n_jumps, n_iters)
-    save_rates = torch.zeros(n_trials, n_jumps, n_iters)
+    save_deltas = torch.zeros(n_trials, n_jumps, n_iters)
 
     ## BIG LOOP FOR EACH MAX JUMP ##
     for tt in range(n_trials):
-        for jump_ind, jump in enumerate(max_jumps):
-            print("running for jump size ", jump)
+        for delta_ind, max_delta in enumerate(max_deltas):
+            print("running for delta size ", max_delta)
             ## set up env and start with some obs ##
 
             env = gym.make("PccNs-v0")
             env.reset()
-            rates = torch.rand(n_start)
+            deltas = torch.rand(n_start) * 2 * max_delta
             rwrds = torch.zeros(n_start)
-            for rind, rr in enumerate(rates):
-                rwrds[rind] = env.step(rr.unsqueeze(0).mul(max_x))[1].item()
+            for rind, rr in enumerate(deltas):
+                rwrds[rind] = env.step(rr.unsqueeze(0))[1].item()
 
-            bo = BayesOpt(rates.mul(max_x), rwrds, normalize=True, max_x=max_x,
-                          acquisition=expected_improvement, max_jump=jump)
+            bo = BayesOpt(deltas, rwrds, normalize=True, max_delta=max_delta,
+                          acquisition=expected_improvement)
 
             for ii in range(n_iters):
                 bo.train_surrogate(iters=250, overwrite=True)
@@ -52,7 +51,7 @@ def main():
 
 
         print("saving trial ", tt)
-        torch.save(save_rates, "max_jump_rates.pt")
+        torch.save(save_rates, "_rates.pt")
         torch.save(save_rewards, "max_jump_rwrds.pt")
 
 if __name__ == '__main__':
