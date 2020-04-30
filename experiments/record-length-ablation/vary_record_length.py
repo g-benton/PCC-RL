@@ -20,10 +20,10 @@ def main():
     n_trials = 20
     max_x = 1000
     n_start = 3
-    max_jump = 500
+    max_delta = 2.
 
     save_rewards = torch.zeros(n_trials, n_jumps, n_iters)
-    save_rates = torch.zeros(n_trials, n_jumps, n_iters)
+    save_deltas = torch.zeros(n_trials, n_jumps, n_iters)
 
     ## BIG LOOP FOR EACH MAX JUMP ##
     for tt in range(n_trials):
@@ -39,7 +39,7 @@ def main():
                 rwrds[rind] = env.step(rr.unsqueeze(0).mul(max_x))[1].item()
 
             bo = BayesOpt(rates.mul(max_x), rwrds, normalize=True, max_x=max_x,
-                          acquisition=expected_improvement, max_jump=max_jump)
+                          acquisition=expected_improvement, max_delta=max_delta)
 
             for ii in range(n_iters):
                 try:
@@ -49,19 +49,15 @@ def main():
                     rwrd = torch.tensor(env.step(next_rate.mul(bo.max_x))[1]).unsqueeze(0)
 
                     save_rewards[tt, rcrd_ind, ii] = rwrd.item()
-                    save_rates[tt, rcrd_ind, ii] = next_rate.item()
+                    save_deltas[tt, rcrd_ind, ii] = next_rate.item()
 
                     bo.update_obs(next_rate, rwrd, max_obs=rcrd)
                 except:
                     save_rewards[tt, rcrd_ind, ii] = rwrd.item()
-                    save_rates[tt, rcrd_ind, ii] = next_rate.item()
-
-                # print(save_rewards[tt, rcrd_ind, ii])
-                # print(save_rates[tt, rcrd_ind, ii])
-                # print("\n")
+                    save_deltas[tt, rcrd_ind, ii] = next_rate.item()
 
         print("saving trial", tt)
-        torch.save(save_rates, "saved_rates.pt")
+        torch.save(save_deltas, "saved_deltas.pt")
         torch.save(save_rewards, "saved_rwrds.pt")
 
 if __name__ == '__main__':
