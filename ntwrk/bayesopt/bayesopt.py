@@ -185,7 +185,7 @@ class BayesOpt(object):
         if self.normalize:
             # print(int_test_points)
             rtrn_val = int_test_points[ind]
-            print("returning ", rtrn_val)
+            # print("returning ", rtrn_val)
             return rtrn_val
         else:
             return test_points[ind]

@@ -41,17 +41,17 @@ def main():
 
             for ii in range(n_iters):
                 bo.train_surrogate(iters=250, overwrite=True)
-                next_rate = bo.acquire(explore=0.1).unsqueeze(0)
-                rwrd = torch.tensor(env.step(next_rate.mul(bo.max_x))[1]).unsqueeze(0)
+                next_rate = bo.acquire(explore=0.01).unsqueeze(0)
+                rwrd = torch.tensor(env.step(next_rate)[1]).unsqueeze(0)
 
-                save_rewards[tt, jump_ind, ii] = rwrd.item()
-                save_rates[tt, jump_ind, ii] = next_rate.item()
+                save_rewards[tt, delta_ind, ii] = rwrd.item()
+                save_deltas[tt, delta_ind, ii] = next_rate.item()
 
                 bo.update_obs(next_rate, rwrd, max_obs=5)
 
 
         print("saving trial ", tt)
-        torch.save(save_rates, "_rates.pt")
+        torch.save(save_deltas, "deltas.pt")
         torch.save(save_rewards, "max_jump_rwrds.pt")
 
 if __name__ == '__main__':
