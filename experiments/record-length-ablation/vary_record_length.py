@@ -33,26 +33,30 @@ def main():
 
             env = gym.make("PccNs-v0")
             env.reset()
-            rates = torch.rand(n_start)
+            deltas = torch.rand(n_start) * 2 * max_delta - max_delta
             rwrds = torch.zeros(n_start)
-            for rind, rr in enumerate(rates):
-                rwrds[rind] = env.step(rr.unsqueeze(0).mul(max_x))[1].item()
+            for rind, rr in enumerate(deltas):
+                rwrds[rind] = env.step(rr.unsqueeze(0))[1].item()
 
-            bo = BayesOpt(rates.mul(max_x), rwrds, normalize=True, max_x=max_x,
+            bo = BayesOpt(deltas, rwrds, normalize=True,
                           acquisition=expected_improvement, max_delta=max_delta)
+
+            rwrd = rwrds[-1]
+            next_rate = deltas[-1]
 
             for ii in range(n_iters):
                 try:
                     bo.train_surrogate(iters=250, overwrite=True)
 
-                    next_rate = bo.acquire(explore=0.1).unsqueeze(0)
-                    rwrd = torch.tensor(env.step(next_rate.mul(bo.max_x))[1]).unsqueeze(0)
+                    next_rate = bo.acquire(explore=0.01).unsqueeze(0)
+                    rwrd = torch.tensor(env.step(next_rate)[1]).unsqueeze(0)
 
                     save_rewards[tt, rcrd_ind, ii] = rwrd.item()
                     save_deltas[tt, rcrd_ind, ii] = next_rate.item()
 
                     bo.update_obs(next_rate, rwrd, max_obs=rcrd)
                 except:
+                    print("not working")
                     save_rewards[tt, rcrd_ind, ii] = rwrd.item()
                     save_deltas[tt, rcrd_ind, ii] = next_rate.item()
 
