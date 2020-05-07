@@ -12,7 +12,7 @@ import numpy as np
 
 def main():
     n_sender = 2
-    n_trials = 10
+    n_trials = 20
 
     max_action = 2.
     max_obs = 3
