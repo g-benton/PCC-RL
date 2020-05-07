@@ -451,6 +451,9 @@ class SimulatedNetworkEnv(gym.Env):
         #event["Cwnd"] = sender_mi.cwnd
         #event["Cwnd Used"] = sender_mi.cwnd_used
         self.event_record["Events"].append(event)
+        # print("avg latency")
+        # print(sender_mi.get("avg latency"))
+        # print("\n")
         if event["Latency"] > 0.0:
             self.run_dur = 0.5 * sender_mi.get("avg latency")
         #print("Sender obs: %s" % sender_obs)

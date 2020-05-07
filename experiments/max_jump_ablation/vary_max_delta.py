@@ -31,7 +31,7 @@ def main():
 
             env = gym.make("PccNs-v0")
             env.reset()
-            deltas = torch.rand(n_start) * 2 * max_delta
+            deltas = torch.rand(n_start) * 2 * max_delta - max_delta
             rwrds = torch.zeros(n_start)
             for rind, rr in enumerate(deltas):
                 rwrds[rind] = env.step(rr.unsqueeze(0))[1].item()

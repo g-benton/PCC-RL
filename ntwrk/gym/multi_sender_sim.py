@@ -430,7 +430,7 @@ class SimulatedNetworkEnv(gym.Env):
 
         # just changing the rate flat out
         for sndr in range(actions.shape[0]):
-            self.senders[sndr].set_rate(actions[sndr, 0].item())
+            self.senders[sndr].apply_rate_delta(actions[sndr, 0].item())
 
         ##################
         ## DON'T CHANGE ##
