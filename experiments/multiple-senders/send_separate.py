@@ -15,6 +15,7 @@ def main():
     n_trials = 10
 
     max_action = 2.
+    max_obs = 3
     n_start = 3
 
     rnds = 1000
@@ -57,7 +58,7 @@ def main():
                 new_x = next_rates[sndr, :].float().clone()
                 new_y = rwrds[sndr].unsqueeze(-1).float().clone()
 
-                bo.update_obs(new_x, new_y, max_obs=3)
+                bo.update_obs(new_x, new_y, max_obs=max_obs)
 
         print("trial", tt, " done")
 
