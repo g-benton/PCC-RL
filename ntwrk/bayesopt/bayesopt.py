@@ -147,7 +147,7 @@ class BayesOpt(object):
         but further down the line we should figure out a way to get a viable
         range for CWND sizes.
         """
-        jitter_num = 50 # maximum points to jitter from boundary if hit
+        jitter_num = 5 # maximum points to jitter from boundary if hit
         test_size = 200 # how many bins to break test domain into
 
 
