@@ -36,7 +36,8 @@ def main():
         BayesOpter = []
         for sndr in range(n_sender):
             BayesOpter.append(BayesOpt(rates[sndr, :, 0], rwrds[sndr, :],
-                                      normalize=True, max_delta=max_action, acquisition=expected_improvement))
+                                      normalize=False, max_delta=max_action,
+                                      acquisition=expected_improvement))
 
         for ii in range(rnds):
 
