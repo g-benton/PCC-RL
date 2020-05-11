@@ -20,7 +20,7 @@ def expected_improvement(bayesopt, test_points, explore=0.01):
     bayesopt.surrogate_lh.eval()
     pred_dist = bayesopt.surrogate_lh(bayesopt.surrogate(test_points))
     mu_test = pred_dist.mean
-    var_test = pred_dist.variance
+    var_test = pred_dist.variance.pow(0.5)
 
 
     imp = mu_test - current_max - explore
@@ -45,7 +45,7 @@ def expected_improvement(bayesopt, test_points, explore=0.01):
 
     return ei
 
-def MPI(bayesopt, test_points):
+def MPI(bayesopt, test_points, explore=0.):
     bayesopt.surrogate.train()
 
     mu_sample = bayesopt.surrogate(bayesopt.train_x).mean
@@ -60,7 +60,7 @@ def MPI(bayesopt, test_points):
     std_test = pred_dist.variance.pow(0.5)
 
     std_normal = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0]))
-    MPI = std_normal.cdf((mu_test - current_max).div(std_test + 1e-9))
+    MPI = std_normal.cdf((mu_test - current_max - explore).div(std_test + 1e-9))
 
     return MPI
 

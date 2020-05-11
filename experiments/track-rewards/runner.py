@@ -57,7 +57,7 @@ def main():
 
         print("saving trial ", tt)
         torch.save(save_actions, "actions.pt")
-        torch.save(save_rewards, "max_jump_rwrds.pt")
+        torch.save(save_rewards, "rwrds.pt")
         torch.save(save_loss, "loss.pt")
         torch.save(save_thruput, "thruput.pt")
         torch.save(save_latency, "latency.pt")
