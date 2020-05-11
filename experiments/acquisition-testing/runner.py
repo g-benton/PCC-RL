@@ -16,8 +16,8 @@ def main():
     ## SETUP AND DEFS ##
     max_deltas = torch.tensor([1, 2, 5, 10, 15, 20, 25, 50, 75, 100])
     n_jumps = max_deltas.numel()
-    n_iters = 10
-    n_trials = 2
+    n_iters = 100
+    n_trials = 20
     n_start = 3
     max_delta = 2.
     max_obs = 3
@@ -67,12 +67,12 @@ def main():
                 bo.update_obs(next_rate, rwrd, max_obs=max_obs)
 
 
-                print("saving trial ", tt)
-                torch.save(save_actions, "actions.pt")
-                torch.save(save_rewards, "max_jump_rwrds.pt")
-                torch.save(save_loss, "loss.pt")
-                torch.save(save_thruput, "thruput.pt")
-                torch.save(save_latency, "latency.pt")
+            print("saving trial ", tt)
+            torch.save(save_actions, "actions.pt")
+            torch.save(save_rewards, "max_jump_rwrds.pt")
+            torch.save(save_loss, "loss.pt")
+            torch.save(save_thruput, "thruput.pt")
+            torch.save(save_latency, "latency.pt")
 
 if __name__ == '__main__':
     main()
