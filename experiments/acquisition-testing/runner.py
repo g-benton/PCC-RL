@@ -54,7 +54,7 @@ def main():
                 if acq_ind == 0:
                     next_rate = bo.acquire(explore=0.01).unsqueeze(0)
                 else:
-                    next_rate = bo.acquire().unsqueeze(0)
+                    next_rate = bo.acquire(explore=0.01).unsqueeze(0)
 
                 rwrd = torch.tensor(env.step(next_rate)[1]).unsqueeze(0)
 
