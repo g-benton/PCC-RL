@@ -1,7 +1,7 @@
 import math
 import torch
 import ntwrk
-from ntwrk.bayesopt import BayesOpt, expected_improvement, max_mean
+from ntwrk.bayesopt import BayesOpt, expected_improvement, max_mean, MPI
 
 import gym
 import sys
@@ -39,7 +39,7 @@ def main():
                 rwrds[rind] = env.step(rr.unsqueeze(0))[1].item()
 
             bo = BayesOpt(deltas, rwrds, normalize=True,
-                          acquisition=expected_improvement, max_delta=max_delta)
+                          acquisition=MPI, max_delta=max_delta)
 
             rwrd = rwrds[-1]
             next_rate = deltas[-1]

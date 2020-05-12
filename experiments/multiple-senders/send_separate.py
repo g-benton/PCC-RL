@@ -1,7 +1,7 @@
 import math
 import torch
 import ntwrk
-from ntwrk.bayesopt import BayesOpt, expected_improvement, max_mean
+from ntwrk.bayesopt import BayesOpt, expected_improvement, max_mean, MPI
 
 import gym
 import sys
@@ -37,7 +37,7 @@ def main():
         for sndr in range(n_sender):
             BayesOpter.append(BayesOpt(rates[sndr, :, 0], rwrds[sndr, :],
                                       normalize=False, max_delta=max_action,
-                                      acquisition=expected_improvement))
+                                      acquisition=MPI))
 
         for ii in range(rnds):
 

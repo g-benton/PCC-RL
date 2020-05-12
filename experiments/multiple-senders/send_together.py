@@ -1,7 +1,7 @@
 import math
 import torch
 import ntwrk
-from ntwrk.bayesopt import BayesOpt, expected_improvement, max_mean
+from ntwrk.bayesopt import BayesOpt, expected_improvement, max_mean, MPI
 
 import gym
 import sys
@@ -35,7 +35,7 @@ def main():
             rwrds[rnd] = torch.tensor(env.step(curr_dlta)[1]).sum()
 
         bo = BayesOpt(deltas, rwrds, normalize=True, max_delta=max_action,
-                      acquisition=expected_improvement)
+                      acquisition=MPI)
 
         ## standard BO loop
         for ii in range(rnds):
