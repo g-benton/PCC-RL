@@ -18,9 +18,15 @@ def main():
     max_obs = 3
     n_start = 3
 
-    rnds = 1000
+    rnds = 100
     saved_rates = torch.zeros(n_trials, rnds, n_sender, 1)
     saved_rwrds = torch.zeros(n_trials, rnds, n_sender)
+
+    save_loss = torch.zeros(n_trials, rnds, n_sender)
+    save_latency = torch.zeros(n_trials, rnds, n_sender)
+    save_thruput = torch.zeros(n_trials, rnds, n_sender)
+
+    save_events = torch.zeros(n_trials, rnds)
 
     fpath = "./saved-outputs/"
 
@@ -51,6 +57,7 @@ def main():
             saved_rates[tt, ii, :, :] = next_rates
 
             ## run the network ##
+            net_out = env.step(next_rates)
             rwrds = torch.tensor(env.step(next_rates)[1])
             saved_rwrds[tt, ii, :] = torch.tensor(rwrds)
 
@@ -61,10 +68,20 @@ def main():
 
                 bo.update_obs(new_x, new_y, max_obs=max_obs)
 
+            for sndr in range(n_sender):
+                save_thruput[tt, ii, sndr] = env.senders[sndr].get_run_data().get("recv rate")
+                save_loss[tt, ii, sndr] = env.senders[sndr].get_run_data().get("loss ratio")
+                save_latency[tt, ii, sndr] = env.senders[sndr].get_run_data().get("avg latency")
+            save_events[tt, ii] = net_out[2]
+
         print("trial", tt, " done")
 
-        torch.save(saved_rates, fpath + "saved_rates.pt")
-        torch.save(saved_rwrds, fpath + "saved_rwrds.pt")
+        torch.save(saved_rates, fpath + "separate_rates.pt")
+        torch.save(saved_rwrds, fpath + "separate_rwrds.pt")
+        torch.save(save_loss, fpath + "separate_loss.pt")
+        torch.save(save_thruput, fpath + "separate_thruput.pt")
+        torch.save(save_latency, fpath + "separate_latency.pt")
+        torch.save(save_events, fpath + "separate_events.pt")
 
 
 if __name__ == '__main__':

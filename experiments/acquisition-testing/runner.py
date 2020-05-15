@@ -19,7 +19,7 @@ def main():
     n_iters = 100
     n_trials = 20
     n_start = 3
-    max_delta = 2.
+    max_delta = 1.
     max_obs = 3
 
     n_acq = 2
@@ -30,6 +30,7 @@ def main():
     save_loss = torch.zeros(n_acq, n_trials, n_iters)
     save_latency = torch.zeros(n_acq, n_trials, n_iters)
     save_actions = torch.zeros(n_acq, n_trials, n_iters)
+    save_events = torch.zeros(n_acq, n_trials, n_iters)
 
     ## BIG LOOP FOR EACH MAX JUMP ##
     for acq_ind in range(n_acq):
@@ -56,7 +57,8 @@ def main():
                 else:
                     next_rate = bo.acquire(explore=0.01).unsqueeze(0)
 
-                rwrd = torch.tensor(env.step(next_rate)[1]).unsqueeze(0)
+                net_out = env.step(next_rate)
+                rwrd = torch.tensor(net_out[1]).unsqueeze(0)
 
                 save_rewards[acq_ind, tt, ii] = rwrd.item()
                 save_actions[acq_ind, tt, ii] = next_rate.item()
@@ -64,6 +66,8 @@ def main():
                 save_thruput[acq_ind, tt, ii] = env.senders[0].get_run_data().get("recv rate")
                 save_loss[acq_ind, tt, ii] = env.senders[0].get_run_data().get("loss ratio")
                 save_latency[acq_ind, tt, ii] = env.senders[0].get_run_data().get("avg latency")
+                save_events[acq_ind, tt, ii] = net_out[2]
+
                 bo.update_obs(next_rate, rwrd, max_obs=max_obs)
 
 
@@ -73,6 +77,7 @@ def main():
             torch.save(save_loss, "loss.pt")
             torch.save(save_thruput, "thruput.pt")
             torch.save(save_latency, "latency.pt")
+            torch.save(save_events, "events.pt")
 
 if __name__ == '__main__':
     main()

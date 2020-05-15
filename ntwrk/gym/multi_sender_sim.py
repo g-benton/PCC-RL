@@ -125,6 +125,7 @@ class Network():
         for sender in self.senders:
             sender.reset_obs()
 
+        events = 0
         while self.cur_time < end_time:
             event_time, cur_latency, event_type, next_hop, sender, dropped = heapq.heappop(self.q)
             #print("Got event %s, to link %d, latency %f at time %f" % (event_type, next_hop, cur_latency, event_time))
@@ -137,6 +138,7 @@ class Network():
             push_new_event = False
 
             if event_type == EVENT_TYPE_ACK:
+                events += 1
                 if next_hop == len(sender.path):
                     if dropped:
                         sender.on_packet_lost()
@@ -153,6 +155,7 @@ class Network():
                     new_event_time += link_latency
                     push_new_event = True
             if event_type == EVENT_TYPE_SEND:
+                events += 1
                 if next_hop == 0:
                     #print("Packet sent at time %f" % self.cur_time)
                     if sender.can_send_packet():
@@ -207,7 +210,7 @@ class Network():
 
             #reward = (throughput / RATE_OBS_SCALE) * np.exp(-1 * (LATENCY_PENALTY * latency / LAT_OBS_SCALE + LOSS_PENALTY * loss))
             rewards[sndr] = reward
-        return rewards
+        return rewards, events
 
 # self.senders = [Sender(random.uniform(0.3, 1.5) * bw, [self.links[0], self.links[1]], 0, self.features, history_len=self.history_len)]
 class Sender():
@@ -373,6 +376,7 @@ class SimulatedNetworkEnv(gym.Env):
         self.net = Network(self.senders, self.links)
         self.run_dur = None
         self.run_period = 0.1
+        self.total_events = 0
         self.steps_taken = 0
         self.max_steps = MAX_STEPS
         self.debug_thpt_changes = False
@@ -435,9 +439,10 @@ class SimulatedNetworkEnv(gym.Env):
         ##################
         ## DON'T CHANGE ##
         ##################
-        reward = self.net.run_for_dur(self.run_dur)
+        reward, events = self.net.run_for_dur(self.run_dur)
         for sender in self.senders:
             sender.record_run()
+        self.total_events += events
         self.steps_taken += 1
         sender_obs = self._get_all_sender_obs()
         sender_mi = self.senders[0].get_run_data()
@@ -466,7 +471,7 @@ class SimulatedNetworkEnv(gym.Env):
         # print(self.senders[1].get_run_data())
 
         self.reward_sum += reward
-        return sender_obs, reward, (self.steps_taken >= self.max_steps or should_stop), {}
+        return sender_obs, reward, self.total_events, (self.steps_taken >= self.max_steps or should_stop), {}
 
     def print_debug(self):
         print("---Link Debug---")
@@ -494,6 +499,7 @@ class SimulatedNetworkEnv(gym.Env):
         self.run_dur = 3 * lat
 
     def reset(self, n_senders=2):
+        self.total_events = 0
         self.steps_taken = 0
         self.net.reset()
         self.create_new_links_and_senders(n_senders)
